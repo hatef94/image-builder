@@ -158,36 +158,12 @@ deps-release: ## Installs/checks dependencies for project releases
 	hack/ensure-kpromo.sh
 	hack/ensure-yq.sh
 
-.PHONY: deps-hcloud
-deps-hcloud: ## Installs/checks dependencies for Hetznercloud builds
-deps-hcloud: deps-common
-	$(PACKER) init packer/config.pkr.hcl
-	$(PACKER) init packer/hcloud/config.pkr.hcl
-
-.PHONY: deps-huaweicloud
-deps-huaweicloud: ## Installs/checks dependencies for HuaweiCloud builds
-deps-huaweicloud: deps-common
-	$(PACKER) init packer/config.pkr.hcl
-	$(PACKER) init packer/huaweicloud/config.pkr.hcl
-
-.PHONY: deps-proxmox
-deps-proxmox: ## Installs/checks dependencies for Proxmox builds
-deps-proxmox: deps-common
-	$(PACKER) init packer/config.pkr.hcl
-	$(PACKER) init packer/proxmox/config.pkr.hcl
-
 .PHONY: deps-lint
 deps-lint: ## Installs/checks dependencies for image-builder code linting
 deps-lint: deps-common
 	hack/ensure-ansible-windows.sh
 	hack/ensure-ansible-lint.sh
 	hack/ensure-shellcheck.sh
-
-.PHONY: deps-vultr
-deps-vultr: ## Installs/checks dependencies for Vultr builds
-deps-vultr: deps-common
-	$(PACKER) init packer/config.pkr.hcl
-	$(PACKER) init packer/vultr/config.pkr.hcl
 
 ## --------------------------------------
 ## Packer Configuration
