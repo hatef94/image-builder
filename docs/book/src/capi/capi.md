@@ -14,22 +14,9 @@ If any needed binaries are not present, they can be installed to `images/capi/.b
 
 ## Providers
 
-* [AWS](./providers/aws.md)
-* [Azure](./providers/azure.md)
-* [CloudStack](./providers/cloudstack.md)
-* [DigitalOcean](./providers/digitalocean.md)
-* [GCP](./providers/gcp.md)
-* [HuaweiCloud](./providers/huaweicloud.md)
-* [IBM Cloud](./providers/ibmcloud.md)
-* [Nutanix](./providers/nutanix.md)
-* [OCI](./providers/oci.md)
-* [3DSOutscale](./providers/3dsoutscale.md)
-* [OpenStack](./providers/openstack.md)
-* [OpenStack remote image building](./providers/openstack-remote.md)
 * [Raw](./providers/raw.md)
 * [VirtualBox](./providers/virtualbox.md)
 * [vSphere](./providers/vsphere.md)
-* [Proxmox](./providers/proxmox.md)
 
 ## Make targets
 

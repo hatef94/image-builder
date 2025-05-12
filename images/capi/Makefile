@@ -1,17 +1,3 @@
-# Copyright 2019 The Kubernetes Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 # If you update this file, please follow
 # https://suva.sh/posts/well-documented-makefiles
 
@@ -20,15 +6,13 @@ SHELL := /usr/bin/env bash
 
 .DEFAULT_GOAL := help
 
-# This option is for running docker manifest command
-export DOCKER_CLI_EXPERIMENTAL := enabled
 export PATH := $(PATH):$(CURDIR)/.local/bin
 # Defining the canonical location of the Packer binary which will be used for
 # `packer init`, `packer build` and `packer validate` commands.
 PACKER=$(shell if [ $$(command -v packer | grep -v sbin) ]; then echo $$(command -v packer); else echo $(CURDIR)/.local/bin/packer; fi)
 
-export IB_VERSION ?= $(shell git describe --dirty)
-
+#export IB_VERSION ?= $(shell git describe --dirty)
+export IB_VERSION ?= $(shell git describe --always)
 ## --------------------------------------
 ## Help
 ## --------------------------------------
@@ -46,7 +30,6 @@ version: ## Display version of image-builder
 
 GET_UBUNTU_DOTTED_SEMVER=$(strip \
 	$(eval _UBUNTU_SEMVER:=$1) \
-	$(eval _UBUNTU_SEMVER:=$(subst ubuntu-2004,ubuntu-20.04,$(_UBUNTU_SEMVER))) \
 	$(eval _UBUNTU_SEMVER:=$(subst ubuntu-2204,ubuntu-22.04,$(_UBUNTU_SEMVER))) \
 	$(eval _UBUNTU_SEMVER:=$(subst ubuntu-2404,ubuntu-24.04,$(_UBUNTU_SEMVER))) \
 	$(_UBUNTU_SEMVER) \
@@ -106,17 +89,6 @@ deps-lint: deps-common
 .PHONY: set-ssh-password
 set-ssh-password:
 	hack/set-ssh-password.sh
-
-## --------------------------------------
-## Container variables
-## --------------------------------------
-REGISTRY ?= gcr.io/$(or $(shell gcloud config get-value project),scl-image-builder)
-STAGING_REGISTRY := gcr.io/k8s-staging-scl-image-builder
-IMAGE_NAME ?= cluster-node-image-builder
-CONTROLLER_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
-TAG ?= dev
-ARCH ?= amd64
-BASE_IMAGE ?= docker.io/library/ubuntu:jammy
 
 ## --------------------------------------
 ## Packer flags
@@ -195,9 +167,7 @@ COMMON_NODE_VAR_FILES := packer/config/kubernetes.json \
 					packer/config/ansible-args.json \
 					packer/config/goss-args.json \
 					packer/config/common.json \
-					packer/config/additional_components.json \
-					packer/config/ecr_credential_provider.json
-
+					packer/config/additional_components.json
 
 
 # Initialize a list of flags to pass to Packer. This includes any existing flags
@@ -212,12 +182,9 @@ ABSOLUTE_PACKER_VAR_FILES := $(foreach f,$(abspath $(PACKER_VAR_FILES)),-var-fil
 ## --------------------------------------
 ## Platform and version combinations
 ## --------------------------------------
-CENTOS_VERSIONS			:=	centos-7
 FLATCAR_VERSIONS		:=	flatcar
-PHOTON_VERSIONS			:=	photon-3 photon-4 photon-5
-RHEL_VERSIONS			:=	rhel-7 rhel-8 rhel-9
-ROCKYLINUX_VERSIONS		:=  rockylinux-8 rockylinux-9
-UBUNTU_VERSIONS			:=	ubuntu-2004 ubuntu-2004-efi ubuntu-2204 ubuntu-2204-efi ubuntu-2404 ubuntu-2404-efi
+PHOTON_VERSIONS			:=  photon-4 photon-5
+UBUNTU_VERSIONS			:=	ubuntu-2204 ubuntu-2204-efi ubuntu-2404 ubuntu-2404-efi
 
 # Set Flatcar Container Linux channel and version if not supplied
 FLATCAR_CHANNEL ?= stable
@@ -228,10 +195,7 @@ endif
 
 export FLATCAR_CHANNEL FLATCAR_VERSION
 
-PLATFORMS_AND_VERSIONS	:=	$(CENTOS_VERSIONS) \
-							$(PHOTON_VERSIONS) \
-							$(RHEL_VERSIONS) \
-							$(ROCKYLINUX_VERSIONS) \
+PLATFORMS_AND_VERSIONS	:=	$(PHOTON_VERSIONS) \
 							$(UBUNTU_VERSIONS) \
 							$(FLATCAR_VERSIONS)
 
@@ -256,11 +220,11 @@ RAW_VALIDATE_TARGETS   := $(addprefix validate-,$(RAW_BUILD_NAMES))
 
 .PHONY: $(NODE_OVA_LOCAL_BUILD_TARGETS)
 $(NODE_OVA_LOCAL_BUILD_TARGETS): deps-ova set-ssh-password
-	$(PACKER) build $(if $(findstring windows,$@),$(PACKER_WINDOWS_NODE_FLAGS),$(PACKER_NODE_FLAGS)) -var-file="packer/ova/packer-common.json" -var-file="$(abspath packer/ova/$(subst build-node-ova-local-,,$@).json)" -except=vsphere -only=vmware-iso $(ABSOLUTE_PACKER_VAR_FILES) packer/ova/packer-$(if $(findstring windows,$@),windows,node).json
+	$(PACKER) build $(PACKER_NODE_FLAGS) -var-file="packer/ova/packer-common.json" -var-file="$(abspath packer/ova/$(subst build-node-ova-local-,,$@).json)" -except=vsphere -only=vmware-iso $(ABSOLUTE_PACKER_VAR_FILES) packer/ova/packer-node.json
 
 .PHONY: $(NODE_OVA_LOCAL_VALIDATE_TARGETS)
 $(NODE_OVA_LOCAL_VALIDATE_TARGETS): deps-ova set-ssh-password
-	$(PACKER) validate $(if $(findstring windows,$@),$(PACKER_WINDOWS_NODE_FLAGS),$(PACKER_NODE_FLAGS)) -var-file="packer/ova/packer-common.json" -var-file="$(abspath packer/ova/$(subst validate-node-ova-local-,,$@).json)" -except=vsphere -only=vmware-iso $(ABSOLUTE_PACKER_VAR_FILES) packer/ova/packer-$(if $(findstring windows,$@),windows,node).json
+	$(PACKER) validate $(PACKER_NODE_FLAGS) -var-file="packer/ova/packer-common.json" -var-file="$(abspath packer/ova/$(subst validate-node-ova-local-,,$@).json)" -except=vsphere -only=vmware-iso $(ABSOLUTE_PACKER_VAR_FILES) packer/ova/packer-node.json
 
 .PHONY: $(NODE_OVA_LOCAL_VMX_BUILD_TARGETS)
 $(NODE_OVA_LOCAL_VMX_BUILD_TARGETS): deps-ova set-ssh-password
@@ -273,7 +237,7 @@ $(NODE_OVA_LOCAL_BASE_BUILD_TARGETS): deps-ova set-ssh-password
 .PHONY: $(NODE_OVA_VSPHERE_BUILD_TARGETS)
 $(NODE_OVA_VSPHERE_BUILD_TARGETS): deps-ova set-ssh-password
     # This uses a packer file builder to input unattend variables into a JSON file to be consumed by the python script before running the vsphere provisioner
-	$(PACKER) build $(if $(findstring windows,$@),$(PACKER_WINDOWS_NODE_FLAGS),$(PACKER_NODE_FLAGS))  -var-file="packer/ova/packer-common.json" -var-file="$(abspath packer/ova/$(subst build-node-ova-vsphere-,,$@).json)" -var-file="packer/ova/vsphere.json"  -except=local -only=vsphere-iso $(ABSOLUTE_PACKER_VAR_FILES) -only=vsphere packer/ova/packer-$(if $(findstring windows,$@),windows,node).json
+	$(PACKER) build $(PACKER_NODE_FLAGS)  -var-file="packer/ova/packer-common.json" -var-file="$(abspath packer/ova/$(subst build-node-ova-vsphere-,,$@).json)" -var-file="packer/ova/vsphere.json"  -except=local -only=vsphere-iso $(ABSOLUTE_PACKER_VAR_FILES) -only=vsphere packer/ova/packer-node.json
 
 .PHONY: $(NODE_OVA_VSPHERE_BASE_BUILD_TARGETS)
 $(NODE_OVA_VSPHERE_BASE_BUILD_TARGETS): deps-ova set-ssh-password
@@ -312,159 +276,71 @@ $(RAW_CLEAN_TARGETS):
 ## Document dynamic build targets
 ## --------------------------------------
 ##@ Builds
-build-node-ova-local-centos-7: ## Builds CentOS 7 Node OVA w local hypervisor
 build-node-ova-local-flatcar: ## Builds Flatcar stable Node OVA w local hypervisor
-build-node-ova-local-photon-3: ## Builds Photon 3 Node OVA w local hypervisor
 build-node-ova-local-photon-4: ## Builds Photon 4 Node OVA w local hypervisor
 build-node-ova-local-photon-5: ## Builds Photon 5 Node OVA w local hypervisor
-build-node-ova-local-rhel-7: ## Builds RHEL 7 Node OVA w local hypervisor
-build-node-ova-local-rhel-8: ## Builds RHEL 8 Node OVA w local hypervisor
-build-node-ova-local-rhel-9: ## Builds RHEL 9 Node OVA w local hypervisor
-build-node-ova-local-rockylinux-8: ## Builds RockyLinux 8 Node OVA w local hypervisor
-build-node-ova-local-rockylinux-9: ## Builds RockyLinux 9 Node OVA w local hypervisor
-build-node-ova-local-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA w local hypervisor
-build-node-ova-local-windows-2019: ## Builds for Windows Server 2019 Node OVA w local hypervisor
 build-node-ova-local-all: $(NODE_OVA_LOCAL_BUILD_TARGETS) ## Builds all Node OVAs w local hypervisor
 
-build-node-ova-vsphere-centos-7: ## Builds CentOS 7 Node OVA and template on vSphere
 build-node-ova-vsphere-flatcar: ## Builds Flatcar stable Node OVA and template on vSphere
-build-node-ova-vsphere-photon-3: ## Builds Photon 3 Node OVA and template on vSphere
 build-node-ova-vsphere-photon-4: ## Builds Photon 4 Node OVA and template on vSphere
 build-node-ova-vsphere-photon-5: ## Builds Photon 5 Node OVA and template on vSphere
-build-node-ova-vsphere-rhel-7: ## Builds RHEL 7 Node OVA and template on vSphere
-build-node-ova-vsphere-rhel-8: ## Builds RHEL 8 Node OVA and template on vSphere
-build-node-ova-vsphere-rhel-9: ## Builds RHEL 9 Node OVA and template on vSphere
-build-node-ova-vsphere-rockylinux-8: ## Builds RockyLinux 8 Node OVA and template on vSphere
-build-node-ova-vsphere-rockylinux-9: ## Builds RockyLinux 9 Node OVA and template on vSphere
-build-node-ova-vsphere-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA and template on vSphere
-build-node-ova-vsphere-ubuntu-2004-efi: ## Builds Ubuntu 20.04 Node OVA and template on vSphere that EFI boots
 build-node-ova-vsphere-ubuntu-2204: ## Builds Ubuntu 22.04 Node OVA and template on vSphere
 build-node-ova-vsphere-ubuntu-2204-efi: ## Builds Ubuntu 22.04 Node OVA and template on vSphere that EFI boots
 build-node-ova-vsphere-ubuntu-2404: ## Builds Ubuntu 24.04 Node OVA and template on vSphere
 build-node-ova-vsphere-ubuntu-2404-efi: ## Builds Ubuntu 24.04 Node OVA and template on vSphere that EFI boots
-build-node-ova-vsphere-windows-2019: ## Builds for Windows Server 2019 and template on vSphere
-build-node-ova-vsphere-windows-2019-efi: ## Builds for Windows Server 2019 and template on vSphere that EFI boots
-build-node-ova-vsphere-windows-2022: ## Builds for Windows Server 2022 template on vSphere
-build-node-ova-vsphere-windows-2022-efi: ## Builds for Windows Server 2022 template on vSphere that EFI boots
 build-node-ova-vsphere-all: $(NODE_OVA_VSPHERE_BUILD_TARGETS) ## Builds all Node OVAs and templates on vSphere
 
-build-node-ova-vsphere-clone-centos-7: ## Builds CentOS 7 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-photon-3: ## Builds Photon 3 Node OVA and template on vSphere
 build-node-ova-vsphere-clone-photon-4: ## Builds Photon 4 Node OVA and template on vSphere
 build-node-ova-vsphere-clone-photon-5: ## Builds Photon 5 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-rhel-7: ## Builds RHEL 7 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-rhel-8: ## Builds RHEL 8 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-rhel-9: ## Builds RHEL 9 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-rockylinux-8: ## Builds RockyLinux 8 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-rockylinux-9: ## Builds RockyLinux 9 Node OVA and template on vSphere
-build-node-ova-vsphere-clone-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA and template on vSphere
 build-node-ova-vsphere-clone-ubuntu-2204: ## Builds Ubuntu 22.04 Node OVA and template on vSphere
 build-node-ova-vsphere-clone-ubuntu-2204-efi: ## ## Builds Ubuntu 22.04 Node OVA and template on vSphere that EFI boots
 build-node-ova-vsphere-clone-ubuntu-2404: ## Builds Ubuntu 24.04 Node OVA and template on vSphere
 build-node-ova-vsphere-clone-ubuntu-2404-efi: ## ## Builds Ubuntu 24.04 Node OVA and template on vSphere that EFI boots
 build-node-ova-vsphere-clone-all: $(NODE_OVA_VSPHERE_CLONE_BUILD_TARGETS) ## Builds all Node OVAs and templates on vSphere
 
-build-node-ova-vsphere-base-centos-7: ## Builds base CentOS 7 Node OVA and template on vSphere
-build-node-ova-vsphere-base-photon-3: ## Builds base Photon 3 Node OVA and template on vSphere
 build-node-ova-vsphere-base-photon-4: ## Builds base Photon 4 Node OVA and template on vSphere
 build-node-ova-vsphere-base-photon-5: ## Builds base Photon 5 Node OVA and template on vSphere
-build-node-ova-vsphere-base-rhel-7: ## Builds base RHEL 7 Node OVA and template on vSphere
-build-node-ova-vsphere-base-rhel-8: ## Builds base RHEL 8 Node OVA and template on vSphere
-build-node-ova-vsphere-base-rhel-9: ## Builds base RHEL 9 Node OVA and template on vSphere
-build-node-ova-vsphere-base-rockylinux-8: ## Builds base RockyLinux 8 Node OVA and template on vSphere
-build-node-ova-vsphere-base-rockylinux-9: ## Builds base RockyLinux 9 Node OVA and template on vSphere
-build-node-ova-vsphere-base-ubuntu-2004: ## Builds base Ubuntu 20.04 Node OVA and template on vSphere
 build-node-ova-vsphere-base-ubuntu-2204: ## Builds base Ubuntu 22.04 Node OVA and template on vSphere
 build-node-ova-vsphere-base-ubuntu-2204-efi: ## Builds Ubuntu 22.04 Node OVA and template on vSphere that EFI boots
 build-node-ova-vsphere-base-ubuntu-2404: ## Builds base Ubuntu 24.04 Node OVA and template on vSphere
 build-node-ova-vsphere-base-ubuntu-2404-efi: ## Builds Ubuntu 24.04 Node OVA and template on vSphere that EFI boots
 build-node-ova-vsphere-base-all: $(NODE_OVA_VSPHERE_BASE_BUILD_TARGETS) ## Builds all base Node OVAs and templates on vSphere
 
-build-node-ova-local-vmx-photon-3: ## Builds Photon 3 Node OVA from VMX file w local hypervisor
 build-node-ova-local-vmx-photon-4: ## Builds Photon 4 Node OVA from VMX file w local hypervisor
 build-node-ova-local-vmx-photon-5: ## Builds Photon 5 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-centos-7: ## Builds Centos 7 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-rhel-7: ## Builds RHEL 7 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-rhel-8: ## Builds RHEL 8 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-rhel-9: ## Builds RHEL 9 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-rockylinux-8: ## Builds RockyLinux 8 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-rockylinux-9: ## Builds RockyLinux 9 Node OVA from VMX file w local hypervisor
-build-node-ova-local-vmx-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA from VMX file w local hypervisor
 
-build-node-ova-local-base-photon-3: ## Builds Photon 3 Base Node OVA w local hypervisor
 build-node-ova-local-base-photon-4: ## Builds Photon 4 Base Node OVA w local hypervisor
 build-node-ova-local-base-photon-5: ## Builds Photon 5 Base Node OVA w local hypervisor
-build-node-ova-local-base-centos-7: ## Builds Centos 7 Base Node OVA w local hypervisor
-build-node-ova-local-base-rhel-7: ## Builds RHEL 7 Base Node OVA w local hypervisor
-build-node-ova-local-base-rhel-8: ## Builds RHEL 8 Base Node OVA w local hypervisor
-build-node-ova-local-base-rhel-9: ## Builds RHEL 9 Base Node OVA w local hypervisor
-build-node-ova-local-base-rockylinux-8: ## Builds RockyLinux 8 Base Node OVA w local hypervisor
-build-node-ova-local-base-rockylinux-9: ## Builds RockyLinux 9 Base Node OVA w local hypervisor
-build-node-ova-local-base-ubuntu-2004: ## Builds Ubuntu 20.04 Base Node OVA w local hypervisor
 
 build-raw-flatcar: ## Builds Flatcar RAW image
-build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
-build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
 build-raw-ubuntu-2204: ## Builds Ubuntu 22.04 RAW image
 build-raw-ubuntu-2204-efi: ## Builds Ubuntu 22.04 RAW image that EFI boots
-build-raw-rhel-8: ## Builds RHEL 8 RAW image
-build-raw-rhel-9: ## Builds RHEL 9 RAW image
-build-raw-rhel-9-efi: ## Builds RHEL 9 RAW image that EFI boots
 build-raw-all: $(RAW_BUILD_TARGETS) ## Builds all RAW images
 
 ## --------------------------------------
 ## Document dynamic validate targets
 ## --------------------------------------
 ##@ Validate packer config
-validate-node-ova-local-centos-7: ## Validates CentOS 7 Node OVA Packer config w local hypervisor
 validate-node-ova-local-flatcar: ## Validates Flatcar stable Node OVA Packer config w local hypervisor
-validate-node-ova-local-photon-3: ## Validates Photon 3 Node OVA Packer config w local hypervisor
 validate-node-ova-local-photon-4: ## Validates Photon 4 Node OVA Packer config w local hypervisor
 validate-node-ova-local-photon-5: ## Validates Photon 5 Node OVA Packer config w local hypervisor
-validate-node-ova-local-rhel-7: ## Validates RHEL 7 Node OVA Packer config w local hypervisor
-validate-node-ova-local-rhel-8: ## Validates RHEL 8 Node OVA Packer config w local hypervisor
-validate-node-ova-local-rhel-9: ## Validates RHEL 9 Node OVA Packer config w local hypervisor
-validate-node-ova-local-rockylinux-8: ## Validates RockyLinux 8 Node OVA Packer config w local hypervisor
-validate-node-ova-local-rockylinux-9: ## Validates RockyLinux 9 Node OVA Packer config w local hypervisor
-validate-node-ova-local-ubuntu-2004: ## Validates Ubuntu 20.04 Node OVA Packer config w local hypervisor
 validate-node-ova-local-ubuntu-2204: ## Validates Ubuntu 22.04 Node OVA Packer config w local hypervisor
 validate-node-ova-local-ubuntu-2404: ## Validates Ubuntu 24.04 Node OVA Packer config w local hypervisor
-validate-node-ova-local-windows-2019: ## Validates Windows Server 2019 Node OVA Packer config w local hypervisor
-validate-node-ova-local-windows-2022: ## Validates Windows Server 2022 Node OVA Packer config w local hypervisor
 validate-node-ova-local-all: $(NODE_OVA_LOCAL_VALIDATE_TARGETS) ## Validates all Node OVAs Packer config w local hypervisor
 
-validate-node-ova-local-vmx-photon-3: ## Validates Photon 3 Node OVA from VMX file w local hypervisor
 validate-node-ova-local-vmx-photon-4: ## Validates Photon 4 Node OVA from VMX file w local hypervisor
 validate-node-ova-local-vmx-photon-5: ## Validates Photon 5 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-centos-7: ## Validates Centos 7 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-rhel-7: ## Validates RHEL 7 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-rhel-8: ## Validates RHEL 8 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-rhel-9: ## Validates RHEL 9 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-rockylinux-8: ## Validates RockyLinux 8 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-rockylinux-9: ## Validates RockyLinux 9 Node OVA from VMX file w local hypervisor
-validate-node-ova-local-vmx-ubuntu-2004: ## Validates Ubuntu 20.04 Node OVA from VMX file w local hypervisor
 validate-node-ova-local-vmx-ubuntu-2204: ## Validates Ubuntu 22.04 Node OVA from VMX file w local hypervisor
 validate-node-ova-local-vmx-ubuntu-2404: ## Validates Ubuntu 24.04 Node OVA from VMX file w local hypervisor
 
-validate-node-ova-local-base-photon-3: ## Validates Photon 3 Base Node OVA w local hypervisor
 validate-node-ova-local-base-photon-4: ## Validates Photon 4 Base Node OVA w local hypervisor
 validate-node-ova-local-base-photon-5: ## Validates Photon 5 Base Node OVA w local hypervisor
-validate-node-ova-local-base-centos-7: ## Validates Centos 7 Base Node OVA w local hypervisor
-validate-node-ova-local-base-rhel-7: ## Validates RHEL 7 Base Node OVA w local hypervisor
-validate-node-ova-local-base-rhel-8: ## Validates RHEL 8 Base Node OVA w local hypervisor
-validate-node-ova-local-base-rhel-9: ## Validates RHEL 9 Base Node OVA w local hypervisor
-validate-node-ova-local-base-rockylinux-8: ## Validates RockyLinux 8 Base Node OVA w local hypervisor
-validate-node-ova-local-base-rockylinux-9: ## Validates RockyLinux 9 Base Node OVA w local hypervisor
-validate-node-ova-local-base-ubuntu-2004: ## Validates Ubuntu 20.04 Base Node OVA w local hypervisor
 validate-node-ova-local-base-ubuntu-2204: ## Validates Ubuntu 22.04 Base Node OVA w local hypervisor
 validate-node-ova-local-base-ubuntu-2404: ## Validates Ubuntu 24.04 Base Node OVA w local hypervisor
 
 validate-raw-flatcar: ## Validates Flatcar RAW image packer config
-validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
-validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
 validate-raw-ubuntu-2204: ## Validates Ubuntu 22.04 RAW image packer config
 validate-raw-ubuntu-2204-efi: ## Validates Ubuntu 22.04 RAW EFI image packer config
-validate-raw-rhel-8: ## Validates RHEL 8 RAW image packer config
 validate-raw-all: $(RAW_VALIDATE_TARGETS) ## Validates all RAW Packer config
 
 validate-all: validate-node-ova-local-all \
@@ -510,26 +386,6 @@ clean-raw: $(RAW_CLEAN_TARGETS)
 clean-packer-cache: ## Removes the packer cache
 clean-packer-cache:
 	rm -fr packer_cache/*
-
-## --------------------------------------
-## Docker targets
-## --------------------------------------
-##@ Docker
-
-.PHONY: docker-pull-prerequisites
-docker-pull-prerequisites:
-	# We must pre-pull images https://github.com/moby/buildkit/issues/1271
-	docker pull docker/dockerfile:1.1-experimental
-	docker pull $(BASE_IMAGE)
-
-.PHONY: docker-build
-docker-build: docker-pull-prerequisites ## Build the Docker image for controller-manager
-	DOCKER_BUILDKIT=1 docker build --build-arg PASSED_IB_VERSION=$(IB_VERSION) --build-arg ARCH=$(ARCH) --build-arg BASE_IMAGE=$(BASE_IMAGE) --build-arg TAG=$(TAG) . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
-
-.PHONY: docker-push
-docker-push: ## Push the Docker image
-	docker push $(CONTROLLER_IMG)-$(ARCH):$(TAG)
-
 ## --------------------------------------
 ## Sort JSON
 ## --------------------------------------
@@ -556,8 +412,6 @@ gen-ignition: deps-ignition ## Generates Ignition files from CLC
 ##@ ISO checksum updates
 .PHONY: update-all-iso-checksums
 update-all-iso-checksums: update-ubuntu-iso-checksums \
-	update-rockylinux-iso-checksums \
-	update-centos-7-iso-checksums \
 	update-centos-9-iso-checksums \
 	update-photon-iso-checksums \
 
@@ -566,16 +420,6 @@ update-all-iso-checksums: ## Updates checksums for all ISOs
 .PHONY: update-ubuntu-iso-checksums
 update-ubuntu-iso-checksums: ## Updates checksums for Ubuntu ISOs
 	hack/update-iso-checksums.sh ubuntu false SHA256SUMS "*iso_file_name" 1
-	$(MAKE) json-sort
-
-.PHONY: update-rockylinux-iso-checksums
-update-rockylinux-iso-checksums: ## Updates checksums for Rocky Linux ISOs
-	hack/update-iso-checksums.sh rockylinux false CHECKSUM "SHA256 (iso_file_name)" 4
-	$(MAKE) json-sort
-
-.PHONY: update-centos-7-iso-checksums
-update-centos-7-iso-checksums: ## Updates checksums for Centos 7 ISOs
-	hack/update-iso-checksums.sh centos-7 false sha256sum.txt "iso_file_name" 1
 	$(MAKE) json-sort
 
 .PHONY: update-centos-9-iso-checksums
