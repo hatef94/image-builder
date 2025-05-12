@@ -86,6 +86,7 @@ deps-lint: deps-common
 ## Packer Configuration
 ## --------------------------------------
 
+
 .PHONY: set-ssh-password
 set-ssh-password:
 	hack/set-ssh-password.sh
@@ -96,9 +97,9 @@ set-ssh-password:
 # Set Packer color to true if not already set in env variables
 # Only valid for builds
 ifneq (,$(findstring build-, $(MAKECMDGOALS)))
-	# A build target
-	PACKER_COLOR ?= true
-	PACKER_FLAGS += -color=$(PACKER_COLOR)
+# A build target
+PACKER_COLOR ?= true
+PACKER_FLAGS += -color=$(PACKER_COLOR)
 endif
 
 # If FOREGROUND=1 then Packer will set headless to false, causing local builds
@@ -168,7 +169,6 @@ COMMON_NODE_VAR_FILES := packer/config/kubernetes.json \
 					packer/config/goss-args.json \
 					packer/config/common.json \
 					packer/config/additional_components.json
-
 
 # Initialize a list of flags to pass to Packer. This includes any existing flags
 # specified by PACKER_FLAGS, as well as prefixing the list with the variable
